@@ -1,0 +1,107 @@
+version: "3.7"
+
+##############
+#
+# Odoo v19 - Docker Swarm Stack
+#
+# Deploy:
+#   docker stack deploy -c docker-compose-swarm.yaml odoo19
+#
+# Primeiro acesso:
+#   https://hof.flisboa.com/web/database/manager
+#   Crie o banco de dados pelo assistente do Odoo.
+#
+# Variáveis sensíveis:
+#   Altere POSTGRES_PASSWORD e admin_passwd antes de colocar em produção.
+#
+##############
+
+services:
+  # ======================================================
+  # ODOO v19 - Servidor Web
+  # ======================================================
+  odoo19:
+    image: odoo:19
+    volumes:
+      - odoo19_data:/var/lib/odoo
+      - odoo19_addons:/mnt/extra-addons
+    networks:
+      - network_public
+    environment:
+      # Configuração do Banco de Dados
+      - HOST=odoo19_db
+      - PORT=5432
+      - USER=odoo
+      - PASSWORD=yA585z15.,.,odoo19
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2048M
+      labels:
+        # Traefik - Roteamento principal (porta 8069)
+        - traefik.enable=true
+        - traefik.http.routers.odoo19.rule=Host(`hof.flisboa.com`)
+        - traefik.http.routers.odoo19.entrypoints=websecure
+        - traefik.http.routers.odoo19.priority=1
+        - traefik.http.routers.odoo19.tls.certresolver=letsencryptresolver
+        - traefik.http.routers.odoo19.service=odoo19
+        - traefik.http.services.odoo19.loadbalancer.server.port=8069
+        - traefik.http.services.odoo19.loadbalancer.passHostHeader=true
+        # Middleware para proxy mode (headers corretos para SSL)
+        - traefik.http.middlewares.odoo19-headers.headers.customrequestheaders.X-Forwarded-Proto=https
+        - traefik.http.routers.odoo19.middlewares=odoo19-headers@docker
+        # Websocket / Longpolling (porta 8072)
+        - traefik.http.routers.odoo19_websocket.rule=Host(`hof.flisboa.com`) && PathPrefix(`/websocket`)
+        - traefik.http.routers.odoo19_websocket.entrypoints=websecure
+        - traefik.http.routers.odoo19_websocket.priority=2
+        - traefik.http.routers.odoo19_websocket.tls.certresolver=letsencryptresolver
+        - traefik.http.routers.odoo19_websocket.service=odoo19_websocket
+        - traefik.http.services.odoo19_websocket.loadbalancer.server.port=8072
+        - traefik.http.services.odoo19_websocket.loadbalancer.passHostHeader=true
+
+  # ======================================================
+  # POSTGRESQL - Banco de Dados dedicado para o Odoo
+  # ======================================================
+  odoo19_db:
+    image: postgres:17
+    volumes:
+      - odoo19_pgdata:/var/lib/postgresql/data
+    networks:
+      - network_public
+    environment:
+      - POSTGRES_USER=odoo
+      - POSTGRES_PASSWORD=yA585z15.,.,odoo19
+      - POSTGRES_DB=postgres
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1024M
+
+volumes:
+  odoo19_data:
+    external: true
+    name: odoo19_data
+  odoo19_addons:
+    external: true
+    name: odoo19_addons
+  odoo19_pgdata:
+    external: true
+    name: odoo19_pgdata
+
+networks:
+  network_public:
+    external: true
+    name: network_public
