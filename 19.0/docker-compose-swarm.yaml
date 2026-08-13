@@ -32,7 +32,7 @@ services:
       - HOST=odoo19_db
       - PORT=5432
       - USER=odoo
-      - PASSWORD=yA585z15.,.,odoo19
+      - PASSWORD=${ODOO_DB_PASSWORD:?defina ODOO_DB_PASSWORD no ambiente do deploy}
     deploy:
       mode: replicated
       replicas: 1
@@ -76,7 +76,7 @@ services:
       - network_public
     environment:
       - POSTGRES_USER=odoo
-      - POSTGRES_PASSWORD=yA585z15.,.,odoo19
+      - POSTGRES_PASSWORD=${ODOO_DB_PASSWORD:?defina ODOO_DB_PASSWORD no ambiente do deploy}
       - POSTGRES_DB=postgres
       - PGDATA=/var/lib/postgresql/data/pgdata
     deploy:
